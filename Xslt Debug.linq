@@ -3,6 +3,15 @@
   <Namespace>LINQPad.Controls</Namespace>
 </Query>
 
+/*
+	TODO: for v1:
+		* Do simple coversation and dump output in container (manual refresh)
+	TODO: for future version:
+		* Remember last configuration and load on start
+		* Auto update result on text or file change
+		* Add support for XLST extensions (use reflection)
+*/
+
 void Main()
 {
 	var inputSelection = DrawUi();
