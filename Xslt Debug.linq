@@ -5,43 +5,48 @@
 void Main()
 {
 	DrawUi();
-	//Util.KeepRunning();
 }
 
 void DrawUi()
 {
-	
-	var xmlFileLink = new LINQPad.Controls.Hyperlink("►File");
-	var xmlTextLink = new LINQPad.Controls.Hyperlink("Text");
-	var xmlFieldTextWrapPanel = new LINQPad.Controls.WrapPanel(new[] { xmlFileLink, xmlTextLink });
-	var xmlFileText = new LINQPad.Controls.TextBox();
-	var xmlFileBrowse = new LINQPad.Controls.Button("Browse");
-	var xmlFileWrapPanel = new LINQPad.Controls.WrapPanel(new LINQPad.Controls.Control[] { xmlFileText, xmlFileBrowse});
-	var xmlText = new LINQPad.Controls.TextArea { AutoHeight = false, Rows = 8 };
-	var xmlTextWrapPanel = new LINQPad.Controls.WrapPanel(xmlText) { Visible = false };
+	DrawInputFields("XML File", "XML Files (*.xml)|*.xml|All files (*.*)|*.*", "Select XML File");
+	DrawInputFields("XSLT File", "XSLT Files (*.xslt)|*.xslt|All files (*.*)|*.*", "Select XSLT File");
+}
 
-	xmlFileLink.Click += (sender, e) => {
-		xmlFileLink.Text = "►File";
-		xmlTextLink.Text = "Text";
-		xmlFileWrapPanel.Visible = true;
-		xmlTextWrapPanel.Visible = false;
+void DrawInputFields(string sectionTitle, string fileFilter, string fileSelectionTitle)
+{
+	
+	var fileLink = new LINQPad.Controls.Hyperlink("►File");
+	var textLink = new LINQPad.Controls.Hyperlink("Text");
+	var fieldTextWrapPanel = new LINQPad.Controls.WrapPanel(new[] { fileLink, textLink });
+	var fileText = new LINQPad.Controls.TextBox();
+	var fileBrowse = new LINQPad.Controls.Button("Browse");
+	var fileWrapPanel = new LINQPad.Controls.WrapPanel(new LINQPad.Controls.Control[] { fileText, fileBrowse});
+	var inputText = new LINQPad.Controls.TextArea { AutoHeight = false, Rows = 8 };
+	var textWrapPanel = new LINQPad.Controls.WrapPanel(inputText) { Visible = false };
+
+	fileLink.Click += (sender, e) => {
+		fileLink.Text = "►File";
+		textLink.Text = "Text";
+		fileWrapPanel.Visible = true;
+		textWrapPanel.Visible = false;
 	};
 
-	xmlTextLink.Click += (sender, e) =>
+	textLink.Click += (sender, e) =>
 	{
-		xmlFileLink.Text = "File";
-		xmlTextLink.Text = "►Text";
-		xmlFileWrapPanel.Visible = false;
-		xmlTextWrapPanel.Visible = true;
+		fileLink.Text = "File";
+		textLink.Text = "►Text";
+		fileWrapPanel.Visible = false;
+		textWrapPanel.Visible = true;
 	};
 	
-	xmlFileBrowse.Click += (sender, e) =>
+	fileBrowse.Click += (sender, e) =>
 	{
 		var openFileDialog = new System.Windows.Forms.OpenFileDialog {
 			CheckFileExists = true,
 			CheckPathExists = true,
-		    Filter = "XML Files (*.xml)|*.xml|All files (*.*)|*.*",
-		    Title = "Select XML File"};
+		    Filter = fileFilter,
+		    Title = fileSelectionTitle};
 
 		var handle = Process.GetProcessById(Util.HostProcessID).MainWindowHandle;
 		var win32Window = new System.Windows.Forms.NativeWindow();
@@ -50,13 +55,13 @@ void DrawUi()
 		var result = openFileDialog.ShowDialog(win32Window);
 		if(result == System.Windows.Forms.DialogResult.OK)
 		{
-			xmlFileText.Text = openFileDialog.FileName;
+			fileText.Text = openFileDialog.FileName;
 		}
 	};
 
-	var xmlField = new LINQPad.Controls.FieldSet("XML File");
-	xmlField.Children.Add(xmlFieldTextWrapPanel);
-	xmlField.Children.Add(xmlFileWrapPanel);
-	xmlField.Children.Add(xmlTextWrapPanel);
-	xmlField.Dump();
+	var section = new LINQPad.Controls.FieldSet(sectionTitle);
+	section.Children.Add(fieldTextWrapPanel);
+	section.Children.Add(fileWrapPanel);
+	section.Children.Add(textWrapPanel);
+	section.Dump();
 }
