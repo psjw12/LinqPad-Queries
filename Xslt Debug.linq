@@ -1,27 +1,31 @@
 <Query Kind="Program">
   <Reference>&lt;RuntimeDirectory&gt;\System.Windows.Forms.dll</Reference>
   <Namespace>LINQPad.Controls</Namespace>
+  <Namespace>System.Xml.Xsl</Namespace>
 </Query>
 
 /*
-	TODO: for v1:
-		* Do simple coversation and dump output in container (manual refresh)
-	TODO: for future version:
+	TODO:
 		* Remember last configuration and load on start
 		* Auto update result on text or file change
 		* Add support for XLST extensions (use reflection)
 */
 
+private DumpContainer xmlOuput = new DumpContainer();
+
 void Main()
 {
-	var inputSelection = DrawUi();
+	DrawUi();
 }
 
-InputSelection DrawUi()
+void DrawUi()
 {
 	var xmlSelection = DrawInputFields("XML File", "XML Files (*.xml)|*.xml|All files (*.*)|*.*", "Select XML File");
 	var xsltSelection = DrawInputFields("XSLT File", "XSLT Files (*.xslt)|*.xslt|All files (*.*)|*.*", "Select XSLT File");
-	return new InputSelection(xmlSelection, xsltSelection);
+	var inputSelection = new InputSelection(xmlSelection, xsltSelection);
+	new Button("Transform", b => Transform(inputSelection)).Dump();
+	xmlOuput.Dump("XML Output");
+	return;
 }
 
 FileSelection DrawInputFields(string sectionTitle, string fileFilter, string fileSelectionTitle)
@@ -98,6 +102,21 @@ FileSelection DrawInputFields(string sectionTitle, string fileFilter, string fil
 	return fileSelection;
 }
 
+void Transform(InputSelection inputSelection)
+{
+	var xslt = new XslCompiledTransform(true);
+	using (var xsltFile = inputSelection.XsltSelection.GetFile())
+	using (var xmlFile = inputSelection.XmlSelection.GetFile())
+	using (var stream = new MemoryStream())
+	{
+		xslt.Load(xsltFile);
+		xslt.Transform(inputSelection.XmlSelection.GetFile(), new XsltArgumentList(), stream);
+		stream.Position = 0;
+		var xml = XDocument.Load(stream);
+		this.xmlOuput.Content = xml;
+	}
+}
+
 public class FileSelection
 {
 	public enum Sources
@@ -156,7 +175,23 @@ public class FileSelection
 
 	public XmlReader GetFile()
 	{
-		throw new NotImplementedException();
+		if (this.Source == Sources.Path)
+		{
+			using (var stream = new FileStream(this.FilePath, FileMode.Open))
+			{
+				var streamReader = new System.IO.StreamReader(stream);
+				var xml = streamReader.ReadToEnd();
+				var stringReader = new StringReader(xml);
+				var reader = new XmlTextReader(stringReader);
+				return reader;
+			}
+		}
+		else
+		{
+			var stringReader = new StringReader(this.Text);
+			var xmlReader = new XmlTextReader(stringReader);
+			return xmlReader;
+		}
 	}	
 }
 
