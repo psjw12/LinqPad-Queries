@@ -31,3 +31,7 @@ Using a SQLite database which can be created using the script `Window Logger.sql
 ## Window Logger\Window Log Report.linq
 
 Using the data created by Window Logger this will chart out either the most used programs, or mosted used windows.
+
+## XSLT Debug.linq
+
+Outputs the transformation result of an XML file against an XSLT file as XML. You can supply path to a file or paste in XML.
