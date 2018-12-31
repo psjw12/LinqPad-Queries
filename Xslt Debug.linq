@@ -104,6 +104,7 @@ FileSelection DrawInputFields(string sectionTitle, string fileFilter, string fil
 
 void Transform(InputSelection inputSelection)
 {
+	ScriptState.Save(inputSelection);
 	var xslt = new XslCompiledTransform(true);
 	using (var xsltFile = inputSelection.XsltSelection.GetFile())
 	using (var xmlFile = inputSelection.XmlSelection.GetFile())
@@ -205,5 +206,24 @@ public class InputSelection
 	{
 		this.XmlSelection = xmlSelection;
 		this.XsltSelection = xsltSelection;
+	}
+}
+
+public static class ScriptState
+{
+	public static void Save(InputSelection inputSelection)
+	{
+		var saveXml = new XDocument(new XElement("XsltDebugState", new[] {
+		new XElement("XsltSelection", new[] {
+			new XElement("Source", inputSelection.XsltSelection.Source),
+			new XElement("FilePath", inputSelection.XsltSelection.FilePath),
+			new XElement("Text", new XCData(inputSelection.XsltSelection.Text))})
+		,
+		new XElement("XmlSelection", new[] {
+			new XElement("Source", inputSelection.XmlSelection.Source),
+			new XElement("FilePath", inputSelection.XmlSelection.FilePath),
+			new XElement("Text", new XCData(inputSelection.XmlSelection.Text))
+		})}));
+		saveXml.Dump("saveXml");
 	}
 }
