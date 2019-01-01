@@ -6,7 +6,6 @@
 
 /*
 	TODO:
-		* Remember last configuration and load on start
 		* Auto update result on text or file change
 		* Add support for XLST extensions (use reflection)
 */
