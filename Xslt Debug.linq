@@ -6,7 +6,6 @@
 
 /*
 	TODO:
-		* Remember last configuration and load on start
 		* Auto update result on text or file change
 		* Add support for XLST extensions (use reflection)
 */
@@ -15,17 +14,18 @@ private DumpContainer xmlOuput = new DumpContainer();
 
 void Main()
 {
-	DrawUi();
+	var inputSelection = DrawUi();
+	ScriptState.Load(inputSelection);
 }
 
-void DrawUi()
+InputSelection DrawUi()
 {
 	var xmlSelection = DrawInputFields("XML File", "XML Files (*.xml)|*.xml|All files (*.*)|*.*", "Select XML File");
 	var xsltSelection = DrawInputFields("XSLT File", "XSLT Files (*.xslt)|*.xslt|All files (*.*)|*.*", "Select XSLT File");
 	var inputSelection = new InputSelection(xmlSelection, xsltSelection);
 	new Button("Transform", b => Transform(inputSelection)).Dump();
 	xmlOuput.Dump("XML Output");
-	return;
+	return inputSelection;
 }
 
 FileSelection DrawInputFields(string sectionTitle, string fileFilter, string fileSelectionTitle)
@@ -104,6 +104,7 @@ FileSelection DrawInputFields(string sectionTitle, string fileFilter, string fil
 
 void Transform(InputSelection inputSelection)
 {
+	ScriptState.Save(inputSelection);
 	var xslt = new XslCompiledTransform(true);
 	using (var xsltFile = inputSelection.XsltSelection.GetFile())
 	using (var xmlFile = inputSelection.XmlSelection.GetFile())
@@ -205,5 +206,44 @@ public class InputSelection
 	{
 		this.XmlSelection = xmlSelection;
 		this.XsltSelection = xsltSelection;
+	}
+}
+
+public static class ScriptState
+{
+	public static string SavePath =>
+			Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "LINQPad", "XsltDebug.xml");
+	
+	public static void Save(InputSelection inputSelection)
+	{
+		var saveXml = new XDocument(new XElement("XsltDebugState", new[] {
+		new XElement("XmlSelection", new[] {
+			new XElement("Source", inputSelection.XmlSelection.Source),
+			new XElement("FilePath", inputSelection.XmlSelection.FilePath),
+			new XElement("Text", new XCData(inputSelection.XmlSelection.Text))
+		}),
+		new XElement("XsltSelection", new[] {
+			new XElement("Source", inputSelection.XsltSelection.Source),
+			new XElement("FilePath", inputSelection.XsltSelection.FilePath),
+			new XElement("Text", new XCData(inputSelection.XsltSelection.Text))})
+		}));
+		saveXml.Declaration = new XDeclaration("1.0", "utf-8", null);		
+		saveXml.Save(SavePath);
+	}
+	
+	public static void Load(InputSelection inputSelection)
+	{
+		if(!File.Exists(SavePath))
+			return;
+			
+		var saveXml = XDocument.Load(SavePath);
+		var xmlSelection = saveXml.Root.Element("XmlSelection");
+		inputSelection.XmlSelection.Source = (FileSelection.Sources)Enum.Parse(typeof(FileSelection.Sources), xmlSelection.Element("Source").Value);
+		inputSelection.XmlSelection.FilePath = xmlSelection.Element("FilePath").Value;
+		inputSelection.XmlSelection.Text = xmlSelection.Element("Text").Value;
+		var xsltSelection = saveXml.Root.Element("XsltSelection");
+		inputSelection.XsltSelection.Source = (FileSelection.Sources)Enum.Parse(typeof(FileSelection.Sources), xsltSelection.Element("Source").Value);
+		inputSelection.XsltSelection.FilePath = xsltSelection.Element("FilePath").Value;
+		inputSelection.XsltSelection.Text = xsltSelection.Element("Text").Value;
 	}
 }
