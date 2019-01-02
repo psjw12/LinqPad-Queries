@@ -8,6 +8,10 @@
 	TODO:
 		* Auto update result on text or file change
 		* Add support for XLST extensions (use reflection)
+			* Needs to load assembly to bind to
+			* Need to either specify or select class to load (must they have no parameters? Do they have a attribute?)
+			* Need to specify namespace
+			* Needs including in state save
 */
 
 private DumpContainer xmlOuput = new DumpContainer();
