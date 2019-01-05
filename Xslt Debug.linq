@@ -1,6 +1,7 @@
 <Query Kind="Program">
   <Reference>&lt;RuntimeDirectory&gt;\System.Windows.Forms.dll</Reference>
   <Namespace>LINQPad.Controls</Namespace>
+  <Namespace>NativeWindow = System.Windows.Forms.NativeWindow</Namespace>
   <Namespace>System.Xml.Xsl</Namespace>
 </Query>
 
@@ -24,15 +25,19 @@ void Main()
 
 InputSelection DrawUi()
 {
-	var xmlSelection = DrawInputFields("XML File", "XML Files (*.xml)|*.xml|All files (*.*)|*.*", "Select XML File");
-	var xsltSelection = DrawInputFields("XSLT File", "XSLT Files (*.xslt)|*.xslt|All files (*.*)|*.*", "Select XSLT File");
-	var inputSelection = new InputSelection(xmlSelection, xsltSelection);
+	var handle = Process.GetProcessById(Util.HostProcessID).MainWindowHandle;
+	var linqPadWindow = new NativeWindow();
+	linqPadWindow.AssignHandle(handle);	
+	var xmlSelection = DrawInputFields("XML File", "XML Files (*.xml)|*.xml|All files (*.*)|*.*", "Select XML File", linqPadWindow);
+	var xsltSelection = DrawInputFields("XSLT File", "XSLT Files (*.xslt)|*.xslt|All files (*.*)|*.*", "Select XSLT File", linqPadWindow);
+	var xsltExtensionsSelection = DrawXstlExtensionsInput(linqPadWindow);
+	var inputSelection = new InputSelection(xmlSelection, xsltSelection, xsltExtensionsSelection);
 	new Button("Transform", b => Transform(inputSelection)).Dump();
 	xmlOuput.Dump("XML Output");
 	return inputSelection;
 }
 
-FileSelection DrawInputFields(string sectionTitle, string fileFilter, string fileSelectionTitle)
+FileSelection DrawInputFields(string sectionTitle, string fileFilter, string fileSelectionTitle, NativeWindow linqPadWindow)
 {
 	var fileLink = new Hyperlink("►File");
 	var textLink = new Hyperlink("Text");
@@ -78,12 +83,8 @@ FileSelection DrawInputFields(string sectionTitle, string fileFilter, string fil
 			CheckPathExists = true,
 		    Filter = fileFilter,
 		    Title = fileSelectionTitle};
-
-		var handle = Process.GetProcessById(Util.HostProcessID).MainWindowHandle;
-		var win32Window = new System.Windows.Forms.NativeWindow();
-		win32Window.AssignHandle(handle);
 		
-		var result = openFileDialog.ShowDialog(win32Window);
+		var result = openFileDialog.ShowDialog(linqPadWindow);
 		if(result == System.Windows.Forms.DialogResult.OK)
 		{
 			fileText.Text = openFileDialog.FileName;
@@ -104,6 +105,47 @@ FileSelection DrawInputFields(string sectionTitle, string fileFilter, string fil
 	};
 	
 	return fileSelection;
+}
+
+IList<XsltExtension> DrawXstlExtensionsInput(NativeWindow linqPadWindow)
+{
+	var headerRow = new TableRow(new[] { new Span("Assembly"), new Span("Class"), new Span("Namespace URI"), new Span() });
+	var tableRows = new List<TableRow>();
+	var extensionDumpContainer = new DumpContainer().Dump();
+	Action renderExtensionTable = null;
+	var openFileDialog = new System.Windows.Forms.OpenFileDialog
+	{
+		CheckFileExists = true,
+		CheckPathExists = true,
+		Filter = "Dynamic Link Library (*.dll)|*.dll",
+		Title = "Select .NET Assembly"
+	};
+	var addButton = new Button("Add", b =>
+	{
+		TableRow tableRow = null;
+		var extensionPathTextbox = new TextBox(width: "20em");
+		var browseButton = new Button("Browse", b2 => {
+			var dialogResult = openFileDialog.ShowDialog(linqPadWindow);
+			if(dialogResult == System.Windows.Forms.DialogResult.OK)
+				extensionPathTextbox.Text = openFileDialog.FileName;
+		}); 
+		var removeButton = new Button("Remove", b2 => {
+			tableRows.Remove(tableRow);
+			renderExtensionTable();
+		});
+		tableRow = new TableRow(new Control[] { new WrapPanel(new Control[] { extensionPathTextbox, browseButton }), new DataListBox() { Width = "20em" }, new TextBox(width: "20em"), removeButton});
+		tableRows.Add(tableRow);
+		renderExtensionTable();
+	});
+	renderExtensionTable = () =>
+	{
+		var extensionsTable = new Table(new[] { headerRow }, true);
+		extensionsTable.Rows.AddRange(tableRows);
+		var extensionFieldSet = new FieldSet("XSLT Extensions", new Control[] { extensionsTable, addButton });
+		extensionDumpContainer.Content = extensionFieldSet;
+	};
+	renderExtensionTable();
+	return null;
 }
 
 void Transform(InputSelection inputSelection)
@@ -200,16 +242,24 @@ public class FileSelection
 	}	
 }
 
+public class XsltExtension
+{
+	
+}
+
 public class InputSelection
 {
 	public FileSelection XmlSelection {get; private set;}
 	
 	public FileSelection XsltSelection {get; private set;}
 	
-	public InputSelection(FileSelection xmlSelection, FileSelection xsltSelection)
+	public IList<XsltExtension> XsltExtensions {get; private set;}
+	
+	public InputSelection(FileSelection xmlSelection, FileSelection xsltSelection, IList<XsltExtension> xsltExtensions)
 	{
 		this.XmlSelection = xmlSelection;
 		this.XsltSelection = xsltSelection;
+		this.XsltExtensions = xsltExtensions;
 	}
 }
 
