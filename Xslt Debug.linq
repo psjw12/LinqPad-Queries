@@ -124,16 +124,21 @@ IList<XsltExtension> DrawXstlExtensionsInput(NativeWindow linqPadWindow)
 	{
 		TableRow tableRow = null;
 		var extensionPathTextbox = new TextBox(width: "20em");
+		var typeDataListBox = new DataListBox() { Width = "20em" };
+		extensionPathTextbox.TextInput += (sender, e) => { typeDataListBox.Options = GetClassesInAssembly(extensionPathTextbox.Text); };
 		var browseButton = new Button("Browse", b2 => {
 			var dialogResult = openFileDialog.ShowDialog(linqPadWindow);
-			if(dialogResult == System.Windows.Forms.DialogResult.OK)
+			if (dialogResult == System.Windows.Forms.DialogResult.OK)
+			{
 				extensionPathTextbox.Text = openFileDialog.FileName;
+				typeDataListBox.Options = GetClassesInAssembly(extensionPathTextbox.Text);
+			}				
 		}); 
 		var removeButton = new Button("Remove", b2 => {
 			tableRows.Remove(tableRow);
 			renderExtensionTable();
 		});
-		tableRow = new TableRow(new Control[] { new WrapPanel(new Control[] { extensionPathTextbox, browseButton }), new DataListBox() { Width = "20em" }, new TextBox(width: "20em"), removeButton});
+		tableRow = new TableRow(new Control[] { new WrapPanel(new Control[] { extensionPathTextbox, browseButton }), typeDataListBox, new TextBox(width: "20em"), removeButton});
 		tableRows.Add(tableRow);
 		renderExtensionTable();
 	});
@@ -146,6 +151,23 @@ IList<XsltExtension> DrawXstlExtensionsInput(NativeWindow linqPadWindow)
 	};
 	renderExtensionTable();
 	return null;
+}
+
+string[] GetClassesInAssembly(string assemblyPath)
+{
+	if(!File.Exists(assemblyPath))
+		return new string[0];
+		
+	try {
+		var assembly = Assembly.LoadFile(assemblyPath);
+		var types = assembly.GetTypes();
+		var noConstructorParametersTypes = types.Where(t => t.GetConstructors().Any(c => c.GetParameters().Count() == 0));
+		return noConstructorParametersTypes.Select(t => t.FullName).ToArray();
+	}
+	catch (Exception)
+	{
+		return new string[0];
+	}
 }
 
 void Transform(InputSelection inputSelection)
