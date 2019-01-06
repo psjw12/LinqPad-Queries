@@ -17,6 +17,8 @@
 
 private DumpContainer xmlOuput = new DumpContainer();
 
+public delegate XsltExtension XsltExtensionEventHandler(string assemblyFilePath, string className, string namespaceUri);
+
 void Main()
 {
 	var inputSelection = DrawUi();
@@ -27,7 +29,7 @@ InputSelection DrawUi()
 {
 	var handle = Process.GetProcessById(Util.HostProcessID).MainWindowHandle;
 	var linqPadWindow = new NativeWindow();
-	linqPadWindow.AssignHandle(handle);	
+	linqPadWindow.AssignHandle(handle);
 	var xmlSelection = DrawInputFields("XML File", "XML Files (*.xml)|*.xml|All files (*.*)|*.*", "Select XML File", linqPadWindow);
 	var xsltSelection = DrawInputFields("XSLT File", "XSLT Files (*.xslt)|*.xslt|All files (*.*)|*.*", "Select XSLT File", linqPadWindow);
 	var xsltExtensionsSelection = DrawXstlExtensionsInput(linqPadWindow);
@@ -44,7 +46,7 @@ FileSelection DrawInputFields(string sectionTitle, string fileFilter, string fil
 	var fieldTextWrapPanel = new WrapPanel(new[] { fileLink, textLink });
 	var fileText = new TextBox();
 	var fileBrowse = new Button("Browse");
-	var fileWrapPanel = new WrapPanel(new Control[] { fileText, fileBrowse});
+	var fileWrapPanel = new WrapPanel(new Control[] { fileText, fileBrowse });
 	var inputText = new TextArea { AutoHeight = false, Rows = 8 };
 	var textWrapPanel = new WrapPanel(inputText) { Visible = false };
 	var fileSelection = new FileSelection(fileText, inputText);
@@ -56,7 +58,7 @@ FileSelection DrawInputFields(string sectionTitle, string fileFilter, string fil
 		fileWrapPanel.Visible = true;
 		textWrapPanel.Visible = false;
 	};
-	
+
 	Action switchToText = () =>
 	{
 		fileLink.Text = "File";
@@ -65,7 +67,8 @@ FileSelection DrawInputFields(string sectionTitle, string fileFilter, string fil
 		textWrapPanel.Visible = true;
 	};
 
-	fileLink.Click += (sender, e) => {
+	fileLink.Click += (sender, e) =>
+	{
 		switchToFile();
 		fileSelection.Source = UserQuery.FileSelection.Sources.Path;
 	};
@@ -75,17 +78,19 @@ FileSelection DrawInputFields(string sectionTitle, string fileFilter, string fil
 		switchToText();
 		fileSelection.Source = UserQuery.FileSelection.Sources.Text;
 	};
-	
+
 	fileBrowse.Click += (sender, e) =>
 	{
-		var openFileDialog = new System.Windows.Forms.OpenFileDialog {
+		var openFileDialog = new System.Windows.Forms.OpenFileDialog
+		{
 			CheckFileExists = true,
 			CheckPathExists = true,
-		    Filter = fileFilter,
-		    Title = fileSelectionTitle};
-		
+			Filter = fileFilter,
+			Title = fileSelectionTitle
+		};
+
 		var result = openFileDialog.ShowDialog(linqPadWindow);
-		if(result == System.Windows.Forms.DialogResult.OK)
+		if (result == System.Windows.Forms.DialogResult.OK)
 		{
 			fileText.Text = openFileDialog.FileName;
 		}
@@ -96,19 +101,21 @@ FileSelection DrawInputFields(string sectionTitle, string fileFilter, string fil
 	section.Children.Add(fileWrapPanel);
 	section.Children.Add(textWrapPanel);
 	section.Dump();
-	
-	fileSelection.SourceChanged += (source, e) => {
-		if(fileSelection.Source == UserQuery.FileSelection.Sources.Path)
+
+	fileSelection.SourceChanged += (source, e) =>
+	{
+		if (fileSelection.Source == UserQuery.FileSelection.Sources.Path)
 			switchToFile();
 		else
 			switchToText();
 	};
-	
+
 	return fileSelection;
 }
 
-IList<XsltExtension> DrawXstlExtensionsInput(NativeWindow linqPadWindow)
+XsltExtensions DrawXstlExtensionsInput(NativeWindow linqPadWindow)
 {
+	var xsltExtensions = new XsltExtensions();
 	var headerRow = new TableRow(new[] { new Span("Assembly"), new Span("Class"), new Span("Namespace URI"), new Span() });
 	var tableRows = new List<TableRow>();
 	var extensionDumpContainer = new DumpContainer().Dump();
@@ -120,27 +127,38 @@ IList<XsltExtension> DrawXstlExtensionsInput(NativeWindow linqPadWindow)
 		Filter = "Dynamic Link Library (*.dll)|*.dll",
 		Title = "Select .NET Assembly"
 	};
-	var addButton = new Button("Add", b =>
+	Func<string, string, string, XsltExtension> addRow = (assemblyFilePath, className, namespaceUri) =>
 	{
 		TableRow tableRow = null;
-		var extensionPathTextbox = new TextBox(width: "20em");
-		var typeDataListBox = new DataListBox() { Width = "20em" };
-		extensionPathTextbox.TextInput += (sender, e) => { typeDataListBox.Options = GetClassesInAssembly(extensionPathTextbox.Text); };
-		var browseButton = new Button("Browse", b2 => {
+		var assemblyPathTextbox = new TextBox(assemblyFilePath, "20em");
+		var typeDataListBox = new DataListBox() { Text = className, Width = "20em" };
+		var namespaceUriTextbox = new TextBox(namespaceUri, "20em");
+		var xsltExtension = new XsltExtension(assemblyPathTextbox, typeDataListBox, namespaceUriTextbox);
+		assemblyPathTextbox.TextInput += (sender, e) => { typeDataListBox.Options = GetClassesInAssembly(assemblyPathTextbox.Text); };
+		var browseButton = new Button("Browse", b2 =>
+		{
 			var dialogResult = openFileDialog.ShowDialog(linqPadWindow);
 			if (dialogResult == System.Windows.Forms.DialogResult.OK)
 			{
-				extensionPathTextbox.Text = openFileDialog.FileName;
-				typeDataListBox.Options = GetClassesInAssembly(extensionPathTextbox.Text);
-			}				
-		}); 
-		var removeButton = new Button("Remove", b2 => {
+				assemblyPathTextbox.Text = openFileDialog.FileName;
+				typeDataListBox.Options = GetClassesInAssembly(assemblyPathTextbox.Text);
+			}
+		});
+		var removeButton = new Button("Remove", b2 =>
+		{
 			tableRows.Remove(tableRow);
+			xsltExtensions.Extensions.Remove(xsltExtension);
 			renderExtensionTable();
 		});
-		tableRow = new TableRow(new Control[] { new WrapPanel(new Control[] { extensionPathTextbox, browseButton }), typeDataListBox, new TextBox(width: "20em"), removeButton});
+		tableRow = new TableRow(new Control[] { new WrapPanel(new Control[] { assemblyPathTextbox, browseButton }), typeDataListBox, namespaceUriTextbox, removeButton });
 		tableRows.Add(tableRow);
 		renderExtensionTable();
+		return xsltExtension;
+	};
+	var addButton = new Button("Add", b =>
+	{
+		var xsltExtension = addRow(string.Empty, string.Empty, string.Empty);
+		xsltExtensions.Extensions.Add(xsltExtension);
 	});
 	renderExtensionTable = () =>
 	{
@@ -150,15 +168,17 @@ IList<XsltExtension> DrawXstlExtensionsInput(NativeWindow linqPadWindow)
 		extensionDumpContainer.Content = extensionFieldSet;
 	};
 	renderExtensionTable();
-	return null;
+	xsltExtensions.XsltExtensionAdded += (assemblyFilePath, className, namespaceUri) => addRow(assemblyFilePath, className, namespaceUri);
+	return xsltExtensions;
 }
 
 string[] GetClassesInAssembly(string assemblyPath)
 {
-	if(!File.Exists(assemblyPath))
+	if (!File.Exists(assemblyPath))
 		return new string[0];
-		
-	try {
+
+	try
+	{
 		var assembly = Assembly.LoadFile(assemblyPath);
 		var types = assembly.GetTypes();
 		var noConstructorParametersTypes = types.Where(t => t.GetConstructors().Any(c => c.GetParameters().Count() == 0));
@@ -214,7 +234,8 @@ public class FileSelection
 		{
 			return this.pathTextControl.Text;
 		}
-		set {
+		set
+		{
 			this.pathTextControl.Text = value;
 		}
 	}
@@ -230,12 +251,12 @@ public class FileSelection
 			this.xmlTextControl.Text = value;
 		}
 	}
-	
+
 	public event EventHandler SourceChanged;
-	
+
 	private ITextControl pathTextControl;
 	private ITextControl xmlTextControl;
-	
+
 	public FileSelection(ITextControl pathTextControl, ITextControl xmlTextControl)
 	{
 		this.pathTextControl = pathTextControl;
@@ -261,23 +282,81 @@ public class FileSelection
 			var xmlReader = new XmlTextReader(stringReader);
 			return xmlReader;
 		}
-	}	
+	}
+}
+
+public class XsltExtensions
+{
+	public IList<XsltExtension> Extensions { get; private set; } = new List<XsltExtension>();
+
+	public void Add(string assemblyFilePath, string className, string namespaceUri)
+	{
+		var xsltExtension = this.XsltExtensionAdded(assemblyFilePath, className, namespaceUri);
+		Extensions.Add(xsltExtension);
+	}
+
+	public event XsltExtensionEventHandler XsltExtensionAdded;
 }
 
 public class XsltExtension
 {
-	
+	public string AssemblyFilePath
+	{
+		get
+		{
+			return this.assemblyFilePathTextControl.Text;
+		}
+		set
+		{
+			this.assemblyFilePathTextControl.Text = value;
+		}
+	}
+
+	public string ClassName
+	{
+		get
+		{
+			return this.classNameTextControl.Text;
+		}
+		set
+		{
+			this.classNameTextControl.Text = value;
+		}
+	}
+
+	public string NamespaceUri
+	{
+		get
+		{
+			return this.namespaceUriTextControl.Text;
+		}
+		set
+		{
+			this.namespaceUriTextControl.Text = value;
+		}
+	}
+
+	private ITextControl assemblyFilePathTextControl;
+	private ITextControl classNameTextControl;
+	private ITextControl namespaceUriTextControl;
+
+	public XsltExtension(ITextControl assemblyFilePathTextControl, ITextControl classNameTextControl, ITextControl namespaceUriTextControl)
+	{
+		this.assemblyFilePathTextControl = assemblyFilePathTextControl;
+		this.classNameTextControl = classNameTextControl;
+		this.namespaceUriTextControl = namespaceUriTextControl;
+	}
 }
 
 public class InputSelection
 {
-	public FileSelection XmlSelection {get; private set;}
-	
-	public FileSelection XsltSelection {get; private set;}
-	
-	public IList<XsltExtension> XsltExtensions {get; private set;}
-	
-	public InputSelection(FileSelection xmlSelection, FileSelection xsltSelection, IList<XsltExtension> xsltExtensions)
+	public FileSelection XmlSelection { get; private set; }
+
+	public FileSelection XsltSelection { get; private set; }
+
+	public XsltExtensions XsltExtensions { get; private set; }
+
+	public InputSelection(FileSelection xmlSelection, FileSelection xsltSelection, XsltExtensions xsltExtensions)
 	{
 		this.XmlSelection = xmlSelection;
 		this.XsltSelection = xsltSelection;
@@ -289,7 +368,7 @@ public static class ScriptState
 {
 	public static string SavePath =>
 			Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "LINQPad", "XsltDebug.xml");
-	
+
 	public static void Save(InputSelection inputSelection)
 	{
 		var saveXml = new XDocument(new XElement("XsltDebugState", new[] {
@@ -303,15 +382,15 @@ public static class ScriptState
 			new XElement("FilePath", inputSelection.XsltSelection.FilePath),
 			new XElement("Text", new XCData(inputSelection.XsltSelection.Text))})
 		}));
-		saveXml.Declaration = new XDeclaration("1.0", "utf-8", null);		
+		saveXml.Declaration = new XDeclaration("1.0", "utf-8", null);
 		saveXml.Save(SavePath);
 	}
-	
+
 	public static void Load(InputSelection inputSelection)
 	{
-		if(!File.Exists(SavePath))
+		if (!File.Exists(SavePath))
 			return;
-			
+
 		var saveXml = XDocument.Load(SavePath);
 		var xmlSelection = saveXml.Root.Element("XmlSelection");
 		inputSelection.XmlSelection.Source = (FileSelection.Sources)Enum.Parse(typeof(FileSelection.Sources), xmlSelection.Element("Source").Value);
