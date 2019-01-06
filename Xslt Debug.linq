@@ -371,6 +371,16 @@ public static class ScriptState
 
 	public static void Save(InputSelection inputSelection)
 	{
+		var extensionsXml = new XElement("XsltExtensions");
+		foreach (var extension in inputSelection.XsltExtensions.Extensions)
+		{
+			var extensionXml = new XElement("XsltExtension", new[] {
+				new XElement("AssemblyPath", extension.AssemblyFilePath),
+				new XElement("ClassName", extension.ClassName),
+				new XElement("NamespaceUri", extension.NamespaceUri)
+			});
+			extensionsXml.Add(extensionXml);
+		}
 		var saveXml = new XDocument(new XElement("XsltDebugState", new[] {
 		new XElement("XmlSelection", new[] {
 			new XElement("Source", inputSelection.XmlSelection.Source),
@@ -381,7 +391,8 @@ public static class ScriptState
 			new XElement("Source", inputSelection.XsltSelection.Source),
 			new XElement("FilePath", inputSelection.XsltSelection.FilePath),
 			new XElement("Text", new XCData(inputSelection.XsltSelection.Text))})
-		}));
+		},
+		extensionsXml));
 		saveXml.Declaration = new XDeclaration("1.0", "utf-8", null);
 		saveXml.Save(SavePath);
 	}
@@ -400,5 +411,12 @@ public static class ScriptState
 		inputSelection.XsltSelection.Source = (FileSelection.Sources)Enum.Parse(typeof(FileSelection.Sources), xsltSelection.Element("Source").Value);
 		inputSelection.XsltSelection.FilePath = xsltSelection.Element("FilePath").Value;
 		inputSelection.XsltSelection.Text = xsltSelection.Element("Text").Value;
+		foreach(var extensionXml in saveXml.Root.Element("XsltExtensions").Elements())
+		{
+			inputSelection.XsltExtensions.Add(
+				extensionXml.Element("AssemblyPath").Value,
+				extensionXml.Element("ClassName").Value,
+				extensionXml.Element("NamespaceUri").Value);
+		}
 	}
 }
