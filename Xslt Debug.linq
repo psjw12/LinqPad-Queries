@@ -194,12 +194,18 @@ void Transform(InputSelection inputSelection)
 {
 	ScriptState.Save(inputSelection);
 	var xslt = new XslCompiledTransform(true);
+	var xsltArgumentList = new XsltArgumentList();
+	foreach(var xsltExtension in inputSelection.XsltExtensions.Extensions)
+	{
+		var handle = Activator.CreateInstanceFrom(xsltExtension.AssemblyFilePath, xsltExtension.ClassName);
+		xsltArgumentList.AddExtensionObject(xsltExtension.NamespaceUri, handle.Unwrap());
+	}
 	using (var xsltFile = inputSelection.XsltSelection.GetFile())
 	using (var xmlFile = inputSelection.XmlSelection.GetFile())
 	using (var stream = new MemoryStream())
 	{
 		xslt.Load(xsltFile);
-		xslt.Transform(inputSelection.XmlSelection.GetFile(), new XsltArgumentList(), stream);
+		xslt.Transform(inputSelection.XmlSelection.GetFile(), xsltArgumentList, stream);
 		stream.Position = 0;
 		var xml = XDocument.Load(stream);
 		this.xmlOuput.Content = xml;
