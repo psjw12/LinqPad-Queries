@@ -7,8 +7,6 @@
 
 private DumpContainer xmlOuput = new DumpContainer();
 
-public delegate XsltExtension XsltExtensionEventHandler(string assemblyFilePath, string className, string namespaceUri);
-
 void Main()
 {
 	var inputSelection = DrawUi();
@@ -22,8 +20,7 @@ InputSelection DrawUi()
 	linqPadWindow.AssignHandle(handle);
 	var xmlSelection = DrawInputFields("XML File", "XML Files (*.xml)|*.xml|All files (*.*)|*.*", "Select XML File", linqPadWindow);
 	var xsltSelection = DrawInputFields("XSLT File", "XSLT Files (*.xslt)|*.xslt|All files (*.*)|*.*", "Select XSLT File", linqPadWindow);
-	var xsltExtensionsSelection = DrawXstlExtensionsInput(linqPadWindow);
-	var inputSelection = new InputSelection(xmlSelection, xsltSelection, xsltExtensionsSelection);
+	var inputSelection = new InputSelection(xmlSelection, xsltSelection);
 	new Button("Transform", b => Transform(inputSelection)).Dump();
 	xmlOuput.Dump("XML Output");
 	return inputSelection;
@@ -103,93 +100,12 @@ FileSelection DrawInputFields(string sectionTitle, string fileFilter, string fil
 	return fileSelection;
 }
 
-XsltExtensions DrawXstlExtensionsInput(NativeWindow linqPadWindow)
-{
-	var xsltExtensions = new XsltExtensions();
-	var headerRow = new TableRow(new[] { new Span("Assembly"), new Span("Class"), new Span("Namespace URI"), new Span() });
-	var tableRows = new List<TableRow>();
-	var extensionDumpContainer = new DumpContainer().Dump();
-	Action renderExtensionTable = null;
-	var openFileDialog = new System.Windows.Forms.OpenFileDialog
-	{
-		CheckFileExists = true,
-		CheckPathExists = true,
-		Filter = "Dynamic Link Library (*.dll)|*.dll",
-		Title = "Select .NET Assembly"
-	};
-	Func<string, string, string, XsltExtension> addRow = (assemblyFilePath, className, namespaceUri) =>
-	{
-		TableRow tableRow = null;
-		var assemblyPathTextbox = new TextBox(assemblyFilePath, "20em");
-		var typeDataListBox = new DataListBox() { Text = className, Width = "20em" };
-		var namespaceUriTextbox = new TextBox(namespaceUri, "20em");
-		var xsltExtension = new XsltExtension(assemblyPathTextbox, typeDataListBox, namespaceUriTextbox);
-		assemblyPathTextbox.TextInput += (sender, e) => { typeDataListBox.Options = GetClassesInAssembly(assemblyPathTextbox.Text); };
-		var browseButton = new Button("Browse", b2 =>
-		{
-			var dialogResult = openFileDialog.ShowDialog(linqPadWindow);
-			if (dialogResult == System.Windows.Forms.DialogResult.OK)
-			{
-				assemblyPathTextbox.Text = openFileDialog.FileName;
-				typeDataListBox.Options = GetClassesInAssembly(assemblyPathTextbox.Text);
-			}
-		});
-		var removeButton = new Button("Remove", b2 =>
-		{
-			tableRows.Remove(tableRow);
-			xsltExtensions.Extensions.Remove(xsltExtension);
-			renderExtensionTable();
-		});
-		tableRow = new TableRow(new Control[] { new WrapPanel(new Control[] { assemblyPathTextbox, browseButton }), typeDataListBox, namespaceUriTextbox, removeButton });
-		tableRows.Add(tableRow);
-		renderExtensionTable();
-		return xsltExtension;
-	};
-	var addButton = new Button("Add", b =>
-	{
-		var xsltExtension = addRow(string.Empty, string.Empty, string.Empty);
-		xsltExtensions.Extensions.Add(xsltExtension);
-	});
-	renderExtensionTable = () =>
-	{
-		var extensionsTable = new Table(new[] { headerRow }, true);
-		extensionsTable.Rows.AddRange(tableRows);
-		var extensionFieldSet = new FieldSet("XSLT Extensions", new Control[] { extensionsTable, addButton });
-		extensionDumpContainer.Content = extensionFieldSet;
-	};
-	renderExtensionTable();
-	xsltExtensions.XsltExtensionAdded += (assemblyFilePath, className, namespaceUri) => addRow(assemblyFilePath, className, namespaceUri);
-	return xsltExtensions;
-}
-
-string[] GetClassesInAssembly(string assemblyPath)
-{
-	if (!File.Exists(assemblyPath))
-		return new string[0];
-
-	try
-	{
-		var assembly = Assembly.LoadFile(assemblyPath);
-		var types = assembly.GetTypes();
-		var noConstructorParametersTypes = types.Where(t => t.GetConstructors().Any(c => c.GetParameters().Count() == 0));
-		return noConstructorParametersTypes.Select(t => t.FullName).ToArray();
-	}
-	catch (Exception)
-	{
-		return new string[0];
-	}
-}
-
 void Transform(InputSelection inputSelection)
 {
 	ScriptState.Save(inputSelection);
 	var xslt = new XslCompiledTransform(true);
 	var xsltArgumentList = new XsltArgumentList();
-	foreach(var xsltExtension in inputSelection.XsltExtensions.Extensions)
-	{
-		var handle = Activator.CreateInstanceFrom(xsltExtension.AssemblyFilePath, xsltExtension.ClassName);
-		xsltArgumentList.AddExtensionObject(xsltExtension.NamespaceUri, handle.Unwrap());
-	}
+	AddXsltExtensions(xsltArgumentList);
 	using (var xsltFile = inputSelection.XsltSelection.GetFile())
 	using (var xmlFile = inputSelection.XmlSelection.GetFile())
 	using (var stream = new MemoryStream())
@@ -200,6 +116,11 @@ void Transform(InputSelection inputSelection)
 		var xml = XDocument.Load(stream);
 		this.xmlOuput.Content = xml;
 	}
+}
+
+void AddXsltExtensions(XsltArgumentList xsltArgumentList)
+{
+	// Add any XSLT extensions here
 }
 
 public class FileSelection
@@ -281,82 +202,16 @@ public class FileSelection
 	}
 }
 
-public class XsltExtensions
-{
-	public IList<XsltExtension> Extensions { get; private set; } = new List<XsltExtension>();
-
-	public void Add(string assemblyFilePath, string className, string namespaceUri)
-	{
-		var xsltExtension = this.XsltExtensionAdded(assemblyFilePath, className, namespaceUri);
-		Extensions.Add(xsltExtension);
-	}
-
-	public event XsltExtensionEventHandler XsltExtensionAdded;
-}
-
-public class XsltExtension
-{
-	public string AssemblyFilePath
-	{
-		get
-		{
-			return this.assemblyFilePathTextControl.Text;
-		}
-		set
-		{
-			this.assemblyFilePathTextControl.Text = value;
-		}
-	}
-
-	public string ClassName
-	{
-		get
-		{
-			return this.classNameTextControl.Text;
-		}
-		set
-		{
-			this.classNameTextControl.Text = value;
-		}
-	}
-
-	public string NamespaceUri
-	{
-		get
-		{
-			return this.namespaceUriTextControl.Text;
-		}
-		set
-		{
-			this.namespaceUriTextControl.Text = value;
-		}
-	}
-
-	private ITextControl assemblyFilePathTextControl;
-	private ITextControl classNameTextControl;
-	private ITextControl namespaceUriTextControl;
-
-	public XsltExtension(ITextControl assemblyFilePathTextControl, ITextControl classNameTextControl, ITextControl namespaceUriTextControl)
-	{
-		this.assemblyFilePathTextControl = assemblyFilePathTextControl;
-		this.classNameTextControl = classNameTextControl;
-		this.namespaceUriTextControl = namespaceUriTextControl;
-	}
-}
-
 public class InputSelection
 {
 	public FileSelection XmlSelection { get; private set; }
 
 	public FileSelection XsltSelection { get; private set; }
 
-	public XsltExtensions XsltExtensions { get; private set; }
-
-	public InputSelection(FileSelection xmlSelection, FileSelection xsltSelection, XsltExtensions xsltExtensions)
+	public InputSelection(FileSelection xmlSelection, FileSelection xsltSelection)
 	{
 		this.XmlSelection = xmlSelection;
 		this.XsltSelection = xsltSelection;
-		this.XsltExtensions = xsltExtensions;
 	}
 }
 
@@ -367,16 +222,6 @@ public static class ScriptState
 
 	public static void Save(InputSelection inputSelection)
 	{
-		var extensionsXml = new XElement("XsltExtensions");
-		foreach (var extension in inputSelection.XsltExtensions.Extensions)
-		{
-			var extensionXml = new XElement("XsltExtension", new[] {
-				new XElement("AssemblyPath", extension.AssemblyFilePath),
-				new XElement("ClassName", extension.ClassName),
-				new XElement("NamespaceUri", extension.NamespaceUri)
-			});
-			extensionsXml.Add(extensionXml);
-		}
 		var saveXml = new XDocument(new XElement("XsltDebugState", new[] {
 		new XElement("XmlSelection", new[] {
 			new XElement("Source", inputSelection.XmlSelection.Source),
@@ -387,8 +232,7 @@ public static class ScriptState
 			new XElement("Source", inputSelection.XsltSelection.Source),
 			new XElement("FilePath", inputSelection.XsltSelection.FilePath),
 			new XElement("Text", new XCData(inputSelection.XsltSelection.Text))})
-		},
-		extensionsXml));
+		}));
 		saveXml.Declaration = new XDeclaration("1.0", "utf-8", null);
 		saveXml.Save(SavePath);
 	}
@@ -407,12 +251,5 @@ public static class ScriptState
 		inputSelection.XsltSelection.Source = (FileSelection.Sources)Enum.Parse(typeof(FileSelection.Sources), xsltSelection.Element("Source").Value);
 		inputSelection.XsltSelection.FilePath = xsltSelection.Element("FilePath").Value;
 		inputSelection.XsltSelection.Text = xsltSelection.Element("Text").Value;
-		foreach(var extensionXml in saveXml.Root.Element("XsltExtensions").Elements())
-		{
-			inputSelection.XsltExtensions.Add(
-				extensionXml.Element("AssemblyPath").Value,
-				extensionXml.Element("ClassName").Value,
-				extensionXml.Element("NamespaceUri").Value);
-		}
 	}
 }
