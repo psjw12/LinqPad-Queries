@@ -1,13 +1,5 @@
 <Query Kind="Program">
-  <Reference>&lt;RuntimeDirectory&gt;\Accessibility.dll</Reference>
-  <Reference>&lt;RuntimeDirectory&gt;\System.Configuration.dll</Reference>
-  <Reference>&lt;RuntimeDirectory&gt;\System.Deployment.dll</Reference>
-  <Reference>&lt;RuntimeDirectory&gt;\System.Runtime.Serialization.Formatters.Soap.dll</Reference>
-  <Reference>&lt;RuntimeDirectory&gt;\System.Security.dll</Reference>
-  <Reference>&lt;RuntimeDirectory&gt;\System.Windows.Forms.dll</Reference>
-  <NuGetReference>HtmlAgilityPack</NuGetReference>
   <Namespace>System.Net</Namespace>
-  <Namespace>HtmlAgilityPack</Namespace>
 </Query>
 
 const string downloadFolder = @"C:\Users\Paul\Downloads\LinqPad";
@@ -22,39 +14,26 @@ void Main()
 	DisplayWebsiteVersions();
 }
 
-public static void DisplayCurrentVersion()
+private static void DisplayCurrentVersion()
 {
 	var linqPadPath = LINQPad.Util.GetFullPath("Linqpad.exe");
 	var linqPadVersionInfo = System.Diagnostics.FileVersionInfo.GetVersionInfo(linqPadPath);
 	$"{linqPadVersionInfo.FileMajorPart}.{linqPadVersionInfo.FileMinorPart}.{linqPadVersionInfo.FileBuildPart.ToString("00")}".Dump("Current version");
 }
 
-public static void DisplayWebsiteVersions()
+private static void DisplayWebsiteVersions()
 {
-	var wc = new WebClient();
-	var webString = wc.DownloadString(@"http://www.linqpad.net/Download.aspx");
-	var htmlDoc = new HtmlDocument();
-	htmlDoc.LoadHtml(webString);
-	var lines = webString.Split('\n');
-	var index = @"				Current release version: <b>";
-	var versionLine = lines.Single(l => l.Contains(index));
-	versionLine = versionLine.Substring(index.Length);
-	var versionString = versionLine.Substring(0, versionLine.IndexOf("</b>"));
-	Util.OnDemand(versionString, () => DownloadFile(linqPadDownloadUrl, versionString)).Dump("Stable");
-	var betaVersionLine = lines.Single(l => l.Contains(@"<a style="""" href=""https://www.linqpad.net/GetFile.aspx?preview+LINQPad5-AnyCPU.zip"">"));
-	var betaIndex = "Download LINQPad ";
-	betaVersionLine = betaVersionLine.Substring(betaVersionLine.IndexOf(betaIndex) + betaIndex.Length);
-	var betaVersionString = betaVersionLine.Substring(0, betaVersionLine.IndexOf(' '));
-	Util.OnDemand(betaVersionString, () => DownloadFile(linqPadBetaDownloadUrl, betaVersionString)).Dump("Beta");
-	var betaHtml = htmlDoc.GetElementbyId("beta");
-	if(betaHtml != null)
-	{
-		Util.RawHtml(cssStyling).Dump();
-		Util.RawHtml(betaHtml.OuterHtml).Dump();
-	}
+	var html = new WebClient().DownloadString(@"https://www.linqpad.net/Download.aspx");
+	var currentVersion = Regex.Match(html, @"(?<=Current release version: <b>)\d+\.\d+\.\d+").Value;;
+	Util.OnDemand(currentVersion, () => DownloadFile(linqPadDownloadUrl, currentVersion)).Dump("Stable");
+	var betaVersion = Regex.Match(html, @"(?<=Download LINQPad )\d+\.\d+\.\d+").Value;
+	Util.OnDemand(betaVersion, () => DownloadFile(linqPadBetaDownloadUrl, betaVersion)).Dump("Beta");
+	var betaChangelog = Regex.Match(html, @"(?<=<h4>What's New<\/h4>\W+)(?:.|\n)*?<\/ul>").Value;
+	Util.RawHtml(cssStyling).Dump();
+	Util.RawHtml(betaChangelog).Dump();
 }
 
-public static Hyperlinq DownloadFile(string url, string version)
+private static Hyperlinq DownloadFile(string url, string version)
 {
 	var wc = new WebClient();
 	var downloadPath = $@"{downloadFolder}LINQPad5-AnyCPU {version}.zip";
