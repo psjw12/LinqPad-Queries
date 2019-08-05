@@ -28,9 +28,12 @@ private static void DisplayWebsiteVersions()
 	Util.OnDemand(currentVersion, () => DownloadFile(linqPadDownloadUrl, currentVersion)).Dump("Stable");
 	var betaVersion = Regex.Match(html, @"(?<=Download LINQPad )\d+\.\d+\.\d+").Value;
 	Util.OnDemand(betaVersion, () => DownloadFile(linqPadBetaDownloadUrl, betaVersion)).Dump("Beta");
-	var betaChangelog = Regex.Match(html, @"(?<=<h4>What's New<\/h4>\W+)(?:.|\n)*?<\/ul>").Value;
-	Util.RawHtml(cssStyling).Dump();
-	Util.RawHtml(betaChangelog).Dump();
+	var betaChangelog = Regex.Match(html, @"(?<=<h4>What's New<\/h4>\W+)(?:.|\n)*?<\/ul>")?.Value;
+	if (betaChangelog != null)
+	{
+		Util.RawHtml(cssStyling).Dump();
+		Util.RawHtml(betaChangelog).Dump();
+	}
 }
 
 private static Hyperlinq DownloadFile(string url, string version)
