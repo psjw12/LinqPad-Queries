@@ -65,22 +65,7 @@ private void GetLinqPad6Versions(Output output)
 	Util.OnDemand(betaVersion, () => DownloadFile(betaDownloadUrl, betaVersion)),
 	Util.OnDemand("Changelog", () => Util.RawHtml(betaChangelog)));
 }
-/*
-private static void DisplayWebsiteVersions()
-{
-	var html = new WebClient().DownloadString(@"https://www.linqpad.net/Download.aspx");
-	var currentVersion = Regex.Match(html, @"(?<=Current release version: <b>)\d+\.\d+\.\d+").Value;
-	Util.OnDemand(currentVersion, () => DownloadFile(linqPadDownloadUrl, currentVersion)).Dump("Stable");
-	var betaVersion = Regex.Match(html, @"(?<=Download LINQPad )\d+\.\d+\.\d+").Value;
-	Util.OnDemand(betaVersion, () => DownloadFile(linqPadBetaDownloadUrl, betaVersion)).Dump("Beta");
-	var betaChangelog = Regex.Match(html, @"(?<=<h4>What's New<\/h4>\W+)(?:.|\n)*?<\/ul>")?.Value;
-	if (betaChangelog != null)
-	{
-		Util.RawHtml(cssStyling).Dump();
-		Util.RawHtml(betaChangelog).Dump();
-	}
-}
-*/
+
 private static Hyperlinq DownloadFile(string url, string version)
 {
 	var wc = new WebClient();
